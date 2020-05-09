@@ -36,6 +36,8 @@ registerExtendRouter()
 
 registerInterceptorRouter()
 
+registerConfigRouter()
+
 app.use(router)
 
 const port = process.env.PORT || 8080
@@ -71,6 +73,12 @@ function registerBaseRouter () {
       let buf = Buffer.concat(msg)
       res.json(buf.toJSON())
     })
+  })
+}
+
+function registerConfigRouter() {
+  router.post('/config/post', function (req, res) {
+    res.json(req.body)
   })
 }
 

@@ -1,38 +1,41 @@
-import {AxiosRequestConfig,AxiosPromise, AxiosResponse} from '../types/index'
+import { AxiosRequestConfig, AxiosPromise, AxiosResponse } from '../types/index'
 import xhr from './xhr'
-import {buildURL} from '../helpers/url'
-import {transformRequest, transformResponse} from '../helpers/data'
-import {precessHeaders} from '../helpers/headers'
+import { buildURL, isAbsoluteURL, combineURL } from '../helpers/url'
+import { flattenHeaders } from '../helpers/headers'
+import transform from './transform'
 
 export default function dispatchRequest(config: AxiosRequestConfig): AxiosPromise {
-    processConfig(config)
-    return xhr(config).then(res => {
-        return transformResponseData(res)
-    })
+  throwIfCancellationRequested(config)
+  processConfig(config)
+  return xhr(config).then(res => {
+    return transformResponseData(res)
+  })
 }
-
 
 function processConfig(config: AxiosRequestConfig): void {
-    config.headers = transformHeaders(config)
-    config.url = transformURL(config)
-    config.data = transformRequestData(config)
+  config.url = transformURL(config)
+  config.data = transform(config.data, config.headers, config.transformRequest)
+  //扁平化headers 删除common method对象下
+  config.headers = flattenHeaders(config.headers, config.method!)
 }
 
-function transformURL(config: AxiosRequestConfig): string{
-    const {url, params} = config
-    return buildURL(url!,params)
+//判断params存在 则在url中拼接请求参数
+function transformURL(config: AxiosRequestConfig): string {
+  let { url, params, paramsSerialize, baseURL } = config
+  if (baseURL && !isAbsoluteURL(url!)) {
+    url = combineURL(baseURL, url)
+  }
+  return buildURL(url!, params, paramsSerialize)
 }
 
-function  transformRequestData(config: AxiosRequestConfig): any {
-    return transformRequest(config.data)
+//如果返回的res.data为字符串 则将其JSON.parse
+function transformResponseData(res: AxiosResponse): AxiosResponse {
+  res.data = transform(res.data, res.headers, res.config.transformResponse)
+  return res
 }
 
-function transformHeaders(config:AxiosRequestConfig): any {
-    const {headers = {},data} = config
-    return precessHeaders(headers,data)
-}
-
-function transformResponseData(res:AxiosResponse): AxiosResponse {
-    res.data = transformResponse(res.data)
-    return res
+function throwIfCancellationRequested(config: AxiosRequestConfig): void {
+  if (config.cancelToken) {
+    config.cancelToken.throwIfRequested()
+  }
 }
